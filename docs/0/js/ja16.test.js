@@ -1,0 +1,125 @@
+import { expect, test, describe } from "bun:test";
+import { Ja16, Ja16Error } from "./ja16.js";
+
+describe("Ja16 規格網羅性完全テスト", () => {
+
+    test("1. 全コードポイント(0x0000-0xFFFF) 穴埋め一貫性・仕様一致テスト", () => {
+        let definedCount = 0;
+        const b64Str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-";
+
+        for (let i = 0x0000; i <= 0xFFFF; i++) {
+            const ja16Char = String.fromCharCode(i);
+            const utf8 = Ja16.toUTF8(ja16Char);
+            
+            // 全てのコードポイントで例外が出ず、双方向に復元できること（穴埋め証明）
+            const backToJa16 = Ja16.fromUTF8(utf8);
+            expect(backToJa16.charCodeAt(0)).toBe(i);
+            definedCount++;
+
+            // --- 特定仕様ポイントの厳密チェック ---
+            
+            // A. Base256領域 (0x0000-0x00FF)
+            if (i >= 0x0000 && i <= 0x003F) {
+                expect(utf8).toBe(b64Str[i]);
+            }
+            if (i >= 0x0040 && i <= 0x007E) {
+                expect(utf8).toBe(String.fromCodePoint(0xFF61 + (i - 0x0040)));
+            }
+            if (i >= 0x007F && i <= 0x0097) {
+                expect(utf8).toBe(String.fromCodePoint(0x03B1 + (i - 0x007F)));
+            }
+            if (i >= 0x0098 && i <= 0x00FF) {
+                const metaChars = /[\\"'`$()\[\]{}*?+|^./:;=!<>@#%~,]/;
+                expect(utf8).not.toMatch(metaChars);
+            }
+
+            // B. セクション2 & 3 & 4 の境界チェック
+            if (i === 0x0000) expect(utf8).toBe("0");
+            if (i === 0x0009) expect(utf8).toBe("9");
+            if (i === 0x000A) expect(utf8).toBe("A");
+            if (i === 0x0023) expect(utf8).toBe("Z");
+            if (i === 0x003D) expect(utf8).toBe("z");
+            if (i === 0x003E) expect(utf8).toBe("_"); 
+            if (i === 0x003F) expect(utf8).toBe("-"); 
+            
+            if (i === 0x0100) expect(utf8).toBe("\t");
+            if (i === 0x0101) expect(utf8).toBe("\n");
+            if (i === 0x0102) expect(utf8).toBe(" ");
+            
+            if (i === 0x0103) expect(utf8).toBe("　"); // U+3000
+            if (i === 0x0143) expect(utf8).toBe("ぁ"); // U+3041
+            if (i === 0x01A2) expect(utf8).toBe("ァ"); // U+30A1
+            if (i === 0x0201) expect(utf8).toBe("！"); // U+FF01
+            if (i === 0x025F) expect(utf8).toBe("一"); // U+4E00
+        }
+        expect(definedCount).toBe(65536);
+        console.log(`検証済み文字数: ${definedCount}`);
+    });
+
+    test("2. 日本語漢字(JIS第1〜第4水準) 網羅性テスト", () => {
+        // 日本語環境で最も重要な漢字を抜き出し、Ja16がこれらを全て「規格内」として扱えるか検証
+        const jisSamples = [
+            "亜", "腕", // 第1水準
+            "弌", "滌", // 第2水準
+            "㐂", "䇹", // 第3水準 (CJK統合漢字拡張A含む)
+            "𠀋", "𡈽"  // 第4水準 (サロゲートペア領域)
+        ];
+
+        for (const kanji of jisSamples) {
+            // エラーにならずに変換できること
+            const enc = Ja16.fromUTF8(kanji);
+            const dec = Ja16.toUTF8(enc);
+            expect(dec).toBe(kanji);
+        }
+    });
+
+    test("3. Base256領域のメタ文字排除テスト (例外: _ と -)", () => {
+        const metaChars = /[\\"'`$()\[\]{}*?+|^./:;=!<>@#%~,]/;
+        for (let i = 0x0000; i <= 0x00FF; i++) {
+            const utf8 = Ja16.toUTF8(String.fromCharCode(i));
+            expect(utf8).not.toMatch(metaChars);
+        }
+    });
+
+    test("4. 境界・巨大データ変換テスト", () => {
+        // 全文字連結 (0x0000 - 0xFFFF)
+        let bigData = "";
+        for (let i = 0; i <= 0xFFFF; i++) bigData += String.fromCharCode(i);
+        
+        const utf8 = Ja16.toUTF8(bigData);
+        const restored = Ja16.fromUTF8(utf8);
+        expect(restored).toBe(bigData);
+
+        const b256 = Ja16.to256(bigData);
+        expect(b256.length).toBe(bigData.length * 2);
+        expect(Ja16.from256(b256)).toBe(bigData);
+    });
+
+    test("5. 自然言語文章の相互変換テスト", () => {
+        const sentences = [
+            "こんにちは、世界！2025年。_ -",
+            "TAB\tとLF\nのテスト。",
+            "漢字テスト：文字情報基盤、JIS第4水準。"
+        ];
+
+        for (const s of sentences) {
+            const enc = Ja16.fromUTF8(s);
+            expect(Ja16.toUTF8(enc)).toBe(s);
+            const b256 = Ja16.to256(enc);
+            expect(Ja16.toUTF8(Ja16.from256(b256))).toBe(s);
+        }
+
+        // 異常系: 未定義サロゲートペア（絵文字）で指定のメッセージが出るか
+        expect(() => Ja16.fromUTF8("🚀")).toThrow(Ja16Error);
+        expect(() => Ja16.fromUTF8("🚀")).toThrow("Ja16規格外の文字が含まれています");
+    });
+
+    test("6. Base256形式のバリデーションとエラーメッセージ確認", () => {
+        // 奇数長エラー
+        expect(() => Ja16.from256("ABC")).toThrow("Base256文字列の長さが不正です(2の倍数が必要)");
+        
+        // Base256領域外（例: "!" U+0021 は排除済み）が含まれる場合のエラー
+        expect(() => Ja16.from256("A!")).toThrow("Base256領域外の文字が含まれています");
+    });
+});
+
