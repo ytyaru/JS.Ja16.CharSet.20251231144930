@@ -1,0 +1,78 @@
+{
+  "specification": {
+    "name": "Ja16",
+    "version": "1.0.0",
+    "description": "日本語を中心とした英数字・記号を網羅した2バイト(16bit)固定長文字セット",
+    "encoding": "UTF-16BE",
+    "total_slots": 65536
+  },
+  "structure": [
+    {
+      "id": "section_1",
+      "name": "Base256領域",
+      "range": { "start": "0x0000", "end": "0x00FF" },
+      "sub_sections": [
+        {
+          "name": "Base64URL(ソート順)",
+          "mapping_type": "literal_string",
+          "data": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-",
+          "comment": "0-9, A-Z, a-z, _, - の順序。正規表現等のメタ文字 '-' を含むがソート性を優先"
+        },
+        {
+          "name": "半角カタカナ",
+          "mapping_type": "unicode_range",
+          "range": { "unicode_start": "0xFF61", "unicode_end": "0xFF9F" },
+          "comment": "JIS X 0201準拠の半角カナ。全55文字（Ja16 0x0040-0x0076）"
+        },
+        {
+          "name": "ギリシャ文字小文字",
+          "mapping_type": "unicode_range",
+          "range": { "unicode_start": "0x03B1", "unicode_end": "0x03C9" },
+          "comment": "αからωまで。Ja16 0x0077から開始"
+        },
+        {
+          "name": "ラテン1補助(安全抽出)",
+          "mapping_type": "filtered_unicode_range",
+          "range": { "unicode_start": "0x00A1", "unicode_end": "0x00FF" },
+          "exclude_regex": "[\\\\\"'`$()\\[\\]{}*?+|^./:;=!<>@#%~,]",
+          "comment": "256スロットの残りを埋める。メタ文字を厳格に排除"
+        }
+      ]
+    },
+    {
+      "id": "section_2",
+      "name": "現代制御コード・空白",
+      "range": { "start": "0x0100", "end": "0x0102" },
+      "mappings": [
+        { "ja16": "0x0100", "unicode": "0x0009", "name": "TAB", "visible_glyph": "U+2B7E" },
+        { "ja16": "0x0101", "unicode": "0x000A", "name": "LF", "visible_glyph": "U+21B2" },
+        { "ja16": "0x0102", "unicode": "0x0020", "name": "SPACE", "visible_glyph": "U+2423" }
+      ]
+    },
+    {
+      "id": "section_3",
+      "name": "日本語記号・かな・全角英数",
+      "range": { "start": "0x0103", "end": "0x025E" },
+      "sub_sections": [
+        { "name": "和文記号", "mapping_type": "unicode_range", "range": { "unicode_start": "0x3000", "unicode_end": "0x303F" } },
+        { "name": "ひらがな", "mapping_type": "unicode_range", "range": { "unicode_start": "0x3041", "unicode_end": "0x309F" } },
+        { "name": "カタカナ", "mapping_type": "unicode_range", "range": { "unicode_start": "0x30A1", "unicode_end": "0x30FF" } },
+        { "name": "全角英数・記号", "mapping_type": "unicode_range", "range": { "unicode_start": "0xFF01", "unicode_end": "0xFF5E" } }
+      ]
+    },
+    {
+      "id": "section_4",
+      "name": "漢字領域(全埋め)",
+      "range": { "start": "0x025F", "end": "0xFFFF" },
+      "strategy": "sequential_fill",
+      "sources": [
+        { "name": "CJK統合漢字", "range": { "start": "0x4E00", "end": "0x9FFF" } },
+        { "name": "CJK拡張A", "range": { "start": "0x3400", "end": "0x4DBF" } },
+        { "name": "CJK互換", "range": { "start": "0xF900", "end": "0xFAFF" } },
+        { "name": "CJK拡張B", "range": { "start": "0x20000", "end": "0x2A6DF" } }
+      ],
+      "comment": "IPA文字情報基盤を優先包含し、残りを拡張Bで0xFFFFまで隙間なく埋める"
+    }
+  ]
+}
+
