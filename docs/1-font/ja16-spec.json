@@ -2,41 +2,39 @@
   "specification": {
     "name": "Ja16",
     "version": "1.0.0",
-    "description": "日本語を中心とした英数字・記号を網羅した2バイト(16bit)固定長文字セット。0x0000-0xFFFFを完全に埋める全字可視化規格。",
-    "encoding_policy": "Fixed 16-bit length, No holes",
+    "description": "日本語環境に最適化された16bit固定長文字セット。0x0000-0xFFFFを完全に埋め、全コードポイントに可視グリフを割り当てる全字可視化規格。",
+    "encoding_policy": "Fixed 16-bit length, No holes, Visualized control codes",
     "total_slots": 65536
   },
   "structure": [
     {
       "id": "section_1_base256",
-      "name": "Base256領域",
+      "name": "Base256領域 (高密度・安全搬送領域)",
       "range": { "start": "0x0000", "end": "0x00FF" },
       "sub_sections": [
         {
           "name": "Base64URL(数値直結順)",
           "mapping_type": "literal_string",
           "data": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-",
-          "comment": "0-9, A-Z, a-z, _, - の順序。数値とグリフの直結を最優先。0x00から順にBase10, 16, 36, 62, 64(URL)の各値として直接対応させるためASCII非互換を許容。0-255領域の『メタ文字排除』要件よりも『Base64URL完結』を優先して '-' を包含。記号順序を規格と反転させたのは、変数名等の識別子として汎用性が高く、ダブルクリック選択時に単語が分断されない '_' を優先するため。",
           "design_intent": {
-            "direct_alignment": "Ja16インデックスをそのまま各進数の値として解釈可能にする(ASCII/Unicode非互換の禁呪採用)",
-            "exception_rule": "Base64URL完結のため正規表現メタ文字 '-' を例外的に許可",
-            "usability_optimization": "識別子として優秀な '_' を '-' より前方に配置し、エディタでの選択効率を向上"
+            "direct_alignment": "Ja16インデックスをそのまま各進数(10, 16, 36, 62, 64)の値として解釈可能にする、計算効率を最優先した数学的設計（既存規格の互換性より、データ処理の直感性を優先した意図的選択）",
+            "usability_optimization": "識別子として優秀な '_' を '-' より前方に配置し、エディタでのダブルクリック選択時の利便性を向上",
+            "visual_density": "全てを半角（Narrow）グリフで構成し、限られた表示面積で最大の情報量を確保する"
           }
         },
         {
           "name": "半角カタカナ",
           "mapping_type": "unicode_range",
           "range": { "unicode_start": "0xFF61", "unicode_end": "0xFF9F" },
-          "design_intent": {
-            "legacy_support": "JIS X 0201の半角カナを網羅。日本独自の半角文化をBase256内に保持"
-          }
+          "design_intent": "JIS X 0201準拠。日本語の最小情報単位として、Base256内に半角幅で保持。IMEでの入力性を担保"
         },
         {
-          "name": "ギリシャ文字小文字",
-          "mapping_type": "unicode_range",
-          "range": { "unicode_start": "0x03B1", "unicode_end": "0x03C9" },
+          "name": "ギリシャ文字・キリル文字小文字(選別)",
+          "mapping_type": "manual_selection",
+          "data": "αβγδεζηθικλμνξοπρστυφχψωабвгдежзийклмнопрстуфхцчшщъыьэюя",
           "design_intent": {
-            "academic_readability": "数学・科学記号として頻用されるギリシャ文字を、IMEで入力しやすい形式でBase256に配置"
+            "input_efficiency": "日本語IMEで『あるふぁ』『べーた』『あー』等と打つことで容易に入力可能。Base256の残枠を、入力しにくいラテン1補助ではなく、日本人になじみ深いIME親和性の高い文字で埋める",
+            "visual_density": "全文字を半角（Narrow）としてデザインし、学術記号や文章の密度を高める"
           }
         },
         {
@@ -45,7 +43,7 @@
           "range": { "unicode_start": "0x00A1", "unicode_end": "0x00FF" },
           "exclude_regex": "[\\\\\"'`$()\\[\\]{}*?+|^./:;=!<>@#%~,]",
           "design_intent": {
-            "binary_visualization": "Base256の残枠を埋める。プログラミング等のメタ文字を徹底排除し、バイナリデータの安全なテキスト化を保証"
+            "binary_visualization": "バイナリデータをJa16として解釈した際、シェルやJSON、正規表現のメタ文字を誘発させない『安全な可視文字』のみをBase256の終端に充填"
           }
         }
       ]
@@ -55,9 +53,9 @@
       "name": "現代制御コード・空白",
       "range": { "start": "0x0100", "end": "0x0102" },
       "mappings": [
-        { "ja16": "0x0100", "unicode": "0x0009", "name": "TAB", "visible_glyph": "U+2B7E", "design_intent": "唯一認める水平制御文字。全字可視化のため ⭾ を割り当て" },
-        { "ja16": "0x0101", "unicode": "0x000A", "name": "LF", "visible_glyph": "U+21B2", "design_intent": "唯一認める垂直制御文字。全字可視化のため ↲ を割り当て" },
-        { "ja16": "0x0102", "unicode": "0x0020", "name": "SPACE", "visible_glyph": "U+2423", "design_intent": "半角空白。全字可視化のため ␣ を割り当て" }
+        { "ja16": "0x0100", "unicode": "0x0009", "name": "TAB", "visible_glyph": "U+2B7E", "design_intent": "唯一認める水平制御文字。全字可視化のため ⭾ を割り当て。Backspace等の物理操作文字は『データセット規格』として不要と判断し除外" },
+        { "ja16": "0x0101", "unicode": "0x000A", "name": "LF", "visible_glyph": "U+21B2", "design_intent": "唯一認める垂直制御文字。全字可視化のため ↲ を割り当て。CR(0x0D)はLFに統合" },
+        { "ja16": "0x0102", "unicode": "0x0020", "name": "SPACE", "visible_glyph": "U+2423", "design_intent": "半角空白。全字可視化のため ␣ を割り当て。不可視の排除" }
       ]
     },
     {
@@ -65,10 +63,9 @@
       "name": "和文記号・かな・全角英数",
       "range": { "start": "0x0103", "end": "0x025E" },
       "sub_sections": [
-        { "name": "和文記号・全角空白", "mapping_type": "unicode_range", "range": { "unicode_start": "0x3000", "unicode_end": "0x303F" }, "design_intent": "全角スペース(可視化:□等)を含む和文固有の記号群を網羅" },
-        { "name": "ひらがな", "mapping_type": "unicode_range", "range": { "unicode_start": "0x3041", "unicode_end": "0x309F" }, "design_intent": "日本語の基幹文字。Unicode順を維持" },
-        { "name": "カタカナ", "mapping_type": "unicode_range", "range": { "unicode_start": "0x30A1", "unicode_end": "0x30FF" }, "design_intent": "外来語用文字。Unicode順を維持" },
-        { "name": "全角英数・記号", "mapping_type": "unicode_range", "range": { "unicode_start": "0xFF01", "unicode_end": "0xFF5E" }, "design_intent": "和文フォントでの表示を前提とした等幅全角文字セット" }
+        { "name": "和文記号・全角空白", "mapping_type": "unicode_range", "range": { "unicode_start": "0x3000", "unicode_end": "0x303F" }, "design_intent": "全角スペース(可視化:U+29EF ⧯)を含む和文固有の記号群" },
+        { "name": "ひらがな・カタカナ", "mapping_type": "unicode_range", "range": { "unicode_start": "0x3041", "unicode_end": "0x30FF" } },
+        { "name": "全角英数・記号", "mapping_type": "unicode_range", "range": { "unicode_start": "0xFF01", "unicode_end": "0xFF5E" }, "design_intent": "プログラミング等に必要な記号( { } [ ] ( ) ; ,等)は、全てこの全角領域で網羅する。これにより、ソースコードの可読性と、バイナリ転送時の安全性を両立させる" }
       ]
     },
     {
@@ -80,13 +77,9 @@
         { "name": "CJK統合漢字", "range": { "start": "0x4E00", "end": "0x9FFF" } },
         { "name": "CJK拡張A", "range": { "start": "0x3400", "end": "0x4DBF" } },
         { "name": "CJK互換漢字", "range": { "start": "0xF900", "end": "0xFAFF" } },
-        { "name": "CJK拡張B", "range": { "start": "0x20000", "end": "0x2A6DF" } }
+        { "name": "CJK拡張B(一部)", "range": { "start": "0x20000", "end": "0x2A6DF" } }
       ],
-      "design_intent": {
-        "identity": "IPA文字情報基盤(JIS第1〜4水準)を100%包含し、日本語の歴史と実用を完結させる。余白はUnicode拡張漢字で埋め、Base65536の連続性を担保",
-        "font_coverage": "花園明朝で網羅される範囲をベースとし、不足する487文字(U+28CFB以降)を別途補完する"
-      }
+      "design_intent": "IPA文字情報基盤を包含。余白を作らず、UnicodeのCJK領域からシーケンシャルに詰め込むことで、65536個のコードポイントを完全に消費する"
     }
   ]
 }
-
